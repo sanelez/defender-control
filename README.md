@@ -1,6 +1,8 @@
 # Defender Control
 Open source Windows Defender disabler. Works on Windows 10 and 11.
 
+Releases ship two binaries: `disable-defender.exe` and `enable-defender.exe`.
+
 ## Microsoft flags this tool
 This repo has been public for years, so Defender ships a signature for it
 (`HackTool:Win32/DefenderControl`) and will quarantine the exe on sight. It is a category
@@ -34,9 +36,14 @@ With the drivers gone the engine cannot start at the next boot, so no Safe Mode 
 A restore list is saved to `%ProgramData%\defender-control` so it can all be undone.
 
 ## How to re-enable
-Build and run the enable config (`DEFENDER_CONFIG` in `settings.hpp`). It renames the
-`.OLD` files back, clears the policy and UI lockdown keys, restores ownership, and sets
-`WinDefend` to auto-start. Then reboot.
+Run the enable binary as admin, then reboot:
+
+```
+enable-defender.exe
+```
+
+It renames the `.OLD` files back, clears the policy and UI lockdown keys, restores
+ownership, and sets `WinDefend` to auto-start.
 
 ## Check status
 After disabling, the Security UI is locked, so check state from a terminal:
