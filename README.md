@@ -74,7 +74,7 @@ Open in Visual Studio 2022, set **Release / x64**, pick disable or enable in
 ![Demo](https://github.com/pgkt04/defender-control/blob/main/resources/demo.gif?raw=true)
 
 ## Release
-See the releases on the right, or [here](https://github.com/pgkt04/defender-control/releases/tag/v1.2).
+See the releases on the right, or [here](https://github.com/pgkt04/defender-control/releases).
 
 ## Star History
 
