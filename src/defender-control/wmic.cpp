@@ -105,10 +105,16 @@ namespace wmic
     }
 
     // Setup WMI request
+    // Read-only classes (e.g. MSFT_MpComputerStatus) expose no methods, so guard
+    // against null before calling GetMethod/SpawnInstance to avoid a crash.
     //
     hres = service_ptr->GetObjectA(class_name, 0, 0, &class_ptr, 0);
-    hres = class_ptr->GetMethod(method_name, 0, &param_def_ptr, 0);
-    hres = param_def_ptr->SpawnInstance(0, &class_inst_ptr);
+
+    if (class_ptr)
+      hres = class_ptr->GetMethod(method_name, 0, &param_def_ptr, 0);
+
+    if (param_def_ptr)
+      hres = param_def_ptr->SpawnInstance(0, &class_inst_ptr);
   }
 
   helper::~helper()
