@@ -1091,3 +1091,117 @@ Well thats all there is to disabling defender... TLDR: We gain TrustedInstaller 
 - https://0x00-0x00.github.io/research/2018/10/17/Windows-API-and-Impersonation-Part1.html  
 - http://myne-us.blogspot.cz/2012/08/reverse-engineering-powershell-cmdlets.html
 
+---
+
+# 2026 Update Plan — privacy.sexy Cross-Reference
+
+This section catalogues the full 2026 Defender-disabling surface (extracted from a
+privacy.sexy v0.13.8 export, 212 technique sections) and cross-references it against the
+current `dcontrol.cpp` implementation. It is the working plan for bringing the project
+up to date.
+
+## Mechanism overview
+
+privacy.sexy uses four mechanism types. The current code implements ~2.5 of them:
+
+| Mechanism | In research | In current code |
+|---|---|---|
+| Registry policy/value writes (~95 keys) | yes | mostly |
+| Service disable (`Set-Service` / `Start=4`) | ~20 services | yes (registry `Start=4`) |
+| **Soft-delete binaries** (takeown + rename `.sys`/`.dll`/`.exe`) | 101 files | **none** |
+| **Disable scheduled tasks** | 5 tasks | **none** |
+
+The code substitutes binary deletion with **IFEO debugger hijack** + **DisallowRun** +
+**process kill**. Valid alternative, but functionally weaker (Defender binaries remain on
+disk and can be relaunched by other triggers).
+
+## Already implemented correctly (matches research)
+
+- **Cloud / MAPS / telemetry**: `DisableBlockAtFirstSeen`, `MpBafsExtendedTimeout=50`,
+  `MpCloudBlockLevel=0`, `SpynetReporting=0`, `LocalSettingOverrideSpynetReporting=0`,
+  `SubmitSamplesConsent=2`, `MAPSReporting=0`, `DisableCoreService1DSTelemetry=1`,
+  `DisableCoreServiceECSIntegration=1`
+- **Real-Time Protection**: all 10 RTP keys (`DisableRealtimeMonitoring`,
+  `DisableBehaviorMonitoring`, `DisableIOAVProtection`, `DisableOnAccessProtection`,
+  `DisableIntrusionPreventionSystem`, `DisableScanOnRealtimeEnable`,
+  `DisableRawWriteNotification`, `DisableInformationProtectionControl`, `IOAVMaxSize=1`,
+  `RealTimeScanDirection=1`)
+- **NIS**: `DisableProtocolRecognition`, `DisableSignatureRetirement`,
+  `ThrottleDetectionEventsRate=10000000`
+- **Signature updates**: every value matches, including the counterintuitive ones the
+  research itself uses (`ForceUpdateFromMU=1`, `UpdateOnStartUp=1`,
+  `SignatureUpdateInterval=24`, `ASSignatureDue`/`AVSignatureDue=0xFFFFFFFF`) and
+  Microsoft's literal misspelling `DisableGenericRePorts`
+- **Threats**: `Threats_ThreatSeverityDefaultAction=1` + per-severity `1`-`5`=`9`
+- **Scan (partial)**: `DisableHeuristics`, `DisableArchiveScanning`, `DisableEmailScanning`,
+  `DisableRemovableDriveScanning`, `DisablePackedExeScanning`, `DisableScanningNetworkFiles`,
+  `DisableScanningMappedNetworkDrivesForFullScan`, `DisableReparsePointScanning`,
+  `DisableRestorePoint`, `DisableCatchupFullScan`, `DisableCatchupQuickScan`, `ScheduleDay=8`,
+  `AvgCPULoadFactor=1`, `ScanOnlyIfIdle=1`, `CheckForSignaturesBeforeRunningScan=0`,
+  `PurgeItemsAfterDelay=1`
+- **AMSI**: HKCU `Windows Script\Settings\AmsiEnable=0`
+- **ETW**: `DefenderApiLogger`/`DefenderAuditLogger` autologgers, WINEVT Operational/WHC channels
+- **Quarantine** purge, **MRT** (both keys), `ServiceKeepAlive`/`AllowFastServiceStartup`
+  (both Defender + Microsoft Antimalware paths)
+- **WTDS** components + feature flags, **App Guard** (`AppHVSI`), **Exploit Guard** NP+CFA,
+  **IE SmartScreen** zones, **Legacy Edge** PhishingFilter, full **Edge** SmartScreen policy
+  set, **UX lockdown**, all Security Center UI section lockdowns, **notifications**, systray
+- **IFEO** debugger list (13 exes) maps ~1:1 onto the exes privacy.sexy soft-deletes
+
+## Missing — Tier 1 (whole categories)
+
+1. **Binary soft-deletion (101 files)** — the research's primary persistence mechanism.
+   Requires TrustedInstaller takeown + rename (to `.old`) with rollback support. Notable
+   targets: `WdFilter.sys`, `WdBoot.sys`, `MsMpEng.exe`, `mpengine.dll`, `MpRtp.dll`,
+   `MpOav.dll` (AMSI provider), `MpClient.dll`, `MpSvc.dll`, the Security Health DLLs,
+   `smartscreen.exe` + libs, `webthreatdefsvc.dll`. (Full list extracted; ~101 entries.)
+2. **Scheduled task disabling (5)** —
+   `\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance`,
+   `... Cleanup`, `... Scheduled Scan`, `... Verification`, and
+   `\Microsoft\Windows\ExploitGuard\ExploitGuard MDM policy Refresh`.
+3. **VBS / HVCI / Device Guard (~16 keys)** —
+   `EnableVirtualizationBasedSecurity=0`, `RequirePlatformSecurityFeatures=0`, HVCI
+   scenarios, `Locked/Unlocked/Mandatory/NoLock`. Currently untouched.
+4. **Firewall** — `EnableFirewall=0` across all 4 profiles in both
+   `Policies\...\WindowsFirewall` and `SharedAccess\...\FirewallPolicy`; services `mpsdrv`
+   + `MpsSvc` not in the service list; netsh disable. (Optional — breaks Store/winget/
+   WSL/Docker/Sandbox.)
+5. **System Guard startup verification** —
+   `DeviceGuard\ConfigureSystemGuardLaunch=2` (policy) and
+   `Scenarios\SystemGuard\Enabled=0` (SGRM services are killed but these keys are not set).
+
+## Missing — Tier 2 (individual registry keys)
+
+- **Scan extras**: `ArchiveMaxDepth=0`, `ArchiveMaxSize=1`,
+  `MissedScheduledScanCountBeforeCatchup=20`, `QuickScanInterval=24`, `ScanParameters=1`,
+  `DisableCpuThrottleOnIdleScans=0`
+- **SmartScreen gaps**: `Explorer\AicEnabled="Anywhere"`; the **`WOW6432Node`** copy of
+  `SmartScreenEnabled=Off` (only the 64-bit hive is written today)
+- **Direct (non-policy) mirrors** the research also writes:
+  `SOFTWARE\Microsoft\Windows Defender\MpEngine` (`MpBafsExtendedTimeout`, `MpCloudBlockLevel`)
+  and `Microsoft Antimalware\Signature Updates\SignatureDisableNotification`
+- **Service**: add `WdDevFlt` (device filter driver) to `disable_services_registry`
+
+## Tier 3 — review (not necessarily bugs)
+
+- **`EnableNetworkProtection`** — code sets `1`; research also sets `1`. But `1` = Block
+  (enabled), `0` = off, `2` = audit. Both look semantically inverted; the in-code comment
+  saying "1 = audit mode" is wrong (audit is `2`). Inherited from the research.
+- **Threat-action value mismatch** — WMI path uses `6` (Allow) for High/Moderate/Low/Severe
+  while the registry path uses `9`. Research uses `9` (registry) and `9` for
+  `UnknownThreatDefaultAction` (WMI). Consider aligning to `9`.
+- **Tamper Protection** — research's "Disable Tamper Protection" section is effectively a
+  manual/no-op (TP cannot be turned off by registry while active). Current
+  `TamperProtection=4` + `Source=2` is a community trick that only sticks if TP is already
+  off or the right token is held.
+
+## Suggested implementation priority
+
+1. **Scheduled tasks (5)** — cheap, high value; `schtasks /Change /DISABLE` or registry.
+2. **Tier 2 registry keys** — trivial additions to existing
+   `set_group_policies` / `disable_smartscreen_registry`.
+3. **VBS/Device Guard + Firewall registry blocks** — new helper functions, medium effort.
+4. **Binary soft-deletion** — largest effort (TrustedInstaller takeown + rename with
+   rollback) and the biggest behavioral change. Decide whether to adopt this vs. keeping the
+   IFEO/service approach.
+
