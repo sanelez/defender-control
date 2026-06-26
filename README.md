@@ -75,13 +75,3 @@ Open in Visual Studio 2022, set **Release / x64**, pick disable or enable in
 
 ## Release
 See the releases on the right, or [here](https://github.com/pgkt04/defender-control/releases).
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=pgkt04%2Fdefender-control&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=pgkt04/defender-control&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=pgkt04/defender-control&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=pgkt04/defender-control&type=date&legend=top-left" />
- </picture>
-</a>
